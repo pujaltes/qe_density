@@ -33,9 +33,9 @@ class Density:
 
         print(
             f"""fname={fname}:
-     items: {list(rho.items())}
-     attrs: {list(rho_data.attrs.items())}
-     compress_ratio: {(rho_data_np.size+rho_index_data_np.size)/rho_full.size}
+                items: {list(rho.items())}
+                attrs: {list(rho_data.attrs.items())}
+                compress_ratio: {(rho_data_np.size + rho_index_data_np.size) / rho_full.size}
                """
         )
         print(rho_index_data_np)
@@ -106,7 +106,7 @@ class Density:
         rot = np.identity(4)
         trans = np.identity(4)
         rot[:3, :3] = self.cell.transpose()
-        trans[:3, 3] = +np.ones(3) / 2
+        trans[:3, 3] = np.ones(3) / 2
         transform = k3d.transform(custom_matrix=rot @ trans)
         rho_full_draw = k3d.volume(self.rho, alpha_coef=15)
         transform.add_drawable(rho_full_draw)
