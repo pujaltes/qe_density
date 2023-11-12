@@ -64,7 +64,7 @@ class Density:
         and the charge must be zero near the boundaries or the calculation is ill-defined
         """
         if np.any(self.cell != self.cell.transpose()):
-            raise NotImplemented("Only orthogonal cells are implemented")
+            raise NotImplementedError("Only orthogonal cells are implemented")
         ang = 0.52917721  # bohr radius
         e_ang2D = 0.2081943  # https://en.wikipedia.org/wiki/Debye
         r0 = 0.0
