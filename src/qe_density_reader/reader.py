@@ -6,7 +6,7 @@ import k3d.transform
 
 
 class Density:
-    def __init__(self, fname: str):
+    def __init__(self, fname: str, verbose: bool = False):
         """
         returns a numpy array given the hdf5 file written by the routine
 
@@ -30,15 +30,15 @@ class Density:
             # But in python indexes starts from 0, so we have the "-1"
             rho_full.flat[idx - 1 : idx - 1 + size] = rho_data_np[count : count + size]
             count += size
-
-        print(
-            f"""fname={fname}:
-                items: {list(rho.items())}
-                attrs: {list(rho_data.attrs.items())}
-                compress_ratio: {(rho_data_np.size + rho_index_data_np.size) / rho_full.size}
-               """
-        )
-        print(rho_index_data_np)
+        if verbose:
+            print(
+                f"""fname={fname}:
+                    items: {list(rho.items())}
+                    attrs: {list(rho_data.attrs.items())}
+                    compress_ratio: {(rho_data_np.size + rho_index_data_np.size) / rho_full.size}
+                """
+            )
+            print(rho_index_data_np)
         self.V = np.linalg.det(rho_cell * alat)
         self.nr = np.array(rho_full.shape).prod()
         # save variables into current instance
