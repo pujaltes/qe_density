@@ -52,6 +52,14 @@ class Density:
         self.rho_data = rho_data
         self.dipole_total = None
 
+        self.compute_transformation()
+
+    def compute_transformation(self):
+        self.rot = np.identity(4)
+        self.trans = np.identity(4)
+        self.rot[:3, :3] = self.cell.transpose()
+        self.trans[:3, 3] = np.ones(3) / 2
+
     def idx2r(self, *args):
         ijk = np.array(args) / self.rho_shape
         # cell vectors are cell[0],cell[1],cell[2]
@@ -103,11 +111,7 @@ class Density:
         return np.linalg.norm(dipole_total)
 
     def display(self, alpha_coef=15):
-        rot = np.identity(4)
-        trans = np.identity(4)
-        rot[:3, :3] = self.cell.transpose()
-        trans[:3, 3] = np.ones(3) / 2
-        transform = k3d.transform(custom_matrix=rot @ trans)
+        transform = k3d.transform(custom_matrix=self.rot @ self.trans)
         rho_full_draw = k3d.volume(self.rho, alpha_coef=alpha_coef)
         transform.add_drawable(rho_full_draw)
         transform.parent_updated()
