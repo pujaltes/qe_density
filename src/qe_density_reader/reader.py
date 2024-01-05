@@ -12,47 +12,39 @@ class Density:
 
         https://gitlab.com/rikigigi/q-e/-/blob/write_rhor_hdf5/Modules/io_base.f90?ref_type=heads#L995
         """
-        rho = h5py.File(fname, "r")
-        self.hdf5file = rho
-        rho_data = rho.get("rho_of_r_data")
-        rho_data_np = np.array(rho_data)
-        rho_index_data_np = np.array(rho.get("rho_of_r_index_size"))
-        rho_cell = rho_data.attrs["cell_vectors"]
-        alat = rho_data.attrs["alat"]
-        self.rho_shape = rho_data.attrs["grid_dimensions"]
-        rho_full = np.zeros(self.rho_shape[::1])
-        atoms_positions = rho_data.attrs["tau"]
-        atoms_types = rho_data.attrs["ityp"]
-        # NOTE: in qe I have the option to not save density values lower than a threshold to save some disk space.
+        self.hdf5file = h5py.File(fname, "r")
+        self.rho_data = self.hdf5file.get("rho_of_r_data")
+        self.alat = self.rho_data.attrs["alat"]
+        self.cell = self.rho_data.attrs["cell_vectors"] * self.alat
+        self.atoms_positions = self.rho_data.attrs["tau"] * self.alat
+        self.rho_shape = self.rho_data.attrs["grid_dimensions"]
+
+        atoms_types = self.rho_data.attrs["ityp"]
+        self.compute_transformation()
+        self.rho = self.unpack_rho()
+        if verbose:
+            print(self.data_info(fname))
+
+        self.V = np.linalg.det(self.cell)
+        self.nr = np.array(self.rho.shape).prod()
+        self.type_idx = self.rho_data.attrs["ityp"] - 1
+        self.atomic_charges = self.rho_data.attrs["zv"][self.type_idx]
+        self.dipole_total = None
+
+    def unpack_rho(self):
+        rho_index_data_np = np.array(self.hdf5file.get("rho_of_r_index_size"))
+        rho_data_np = np.array(self.rho_data)
+
+        rho = np.zeros(self.rho_shape[::1])
         count = 0
+        # NOTE: in qe I have the option to not save density values lower than a threshold to save some disk space.
         for idx, size in zip(rho_index_data_np[0::2], rho_index_data_np[1::2]):
             # NB: the index from the file are fortran one, so the first element is 1.
             # But in python indexes starts from 0, so we have the "-1"
-            rho_full.flat[idx - 1 : idx - 1 + size] = rho_data_np[count : count + size]
+            rho.flat[idx - 1 : idx - 1 + size] = rho_data_np[count : count + size]
             count += size
-        if verbose:
-            print(
-                f"""fname={fname}:
-                    items: {list(rho.items())}
-                    attrs: {list(rho_data.attrs.items())}
-                    compress_ratio: {(rho_data_np.size + rho_index_data_np.size) / rho_full.size}
-                """
-            )
-            print(rho_index_data_np)
-        self.V = np.linalg.det(rho_cell * alat)
-        self.nr = np.array(rho_full.shape).prod()
-        # save variables into current instance
-        self.hdf_file = rho
-        self.rho = rho_full
-        self.type_idx = rho_data.attrs["ityp"] - 1
-        self.atomic_charges = rho_data.attrs["zv"][self.type_idx]
-        self.atoms_positions = atoms_positions * alat
-        self.cell = rho_cell * alat
-        self.alat = alat
-        self.rho_data = rho_data
-        self.dipole_total = None
 
-        self.compute_transformation()
+        return rho
 
     def compute_transformation(self):
         self.rot = np.identity(4)
@@ -60,10 +52,37 @@ class Density:
         self.rot[:3, :3] = self.cell.transpose()
         self.trans[:3, 3] = np.ones(3) / 2
 
+    def data_info(self, fname):
+        rho_index_data_np = np.array(self.hdf5file.get("rho_of_r_index_size"))
+        rho_data_np = np.array(self.rho_data)
+        info = f"""
+            fname={fname}:
+            items: {list(self.hdf5file.items())}
+            attrs: {list(self.rho_data.attrs.items())}
+            compress_ratio: {(rho_data_np.size + rho_index_data_np.size) / self.rho.size}
+            \n rho_index_data_np: {rho_index_data_np}
+        """
+        return info
+
     def idx2r(self, *args):
         ijk = np.array(args) / self.rho_shape
         # cell vectors are cell[0],cell[1],cell[2]
         return ijk @ self.cell
+
+    def get_coords(self):
+        """
+        Get the coordinates of the grid points.
+        """
+        grid = np.array(
+            np.meshgrid(
+                np.arange(0, self.rho_shape[0]),
+                np.arange(0, self.rho_shape[1]),
+                np.arange(0, self.rho_shape[2]),
+                indexing="ij",
+            )
+        )
+        coords = np.tensordot(grid / self.rho_shape[:, None, None, None], self.cell, axes=(0, 1))
+        return coords
 
     def dipole(self):
         """
@@ -91,17 +110,9 @@ class Density:
         #            dip+=r*rho_full[i,j,k]*dV
 
         dV = self.V / self.nr
-        # index grid
-        grid = np.array(
-            np.meshgrid(
-                np.arange(0, self.rho_shape[0]),
-                np.arange(0, self.rho_shape[1]),
-                np.arange(0, self.rho_shape[2]),
-                indexing="ij",
-            )
-        )
         # coord grid
-        coords = np.tensordot(grid / self.rho_shape[:, None, None, None], self.cell, axes=(0, 1)) * ang - r0
+        coords = self.get_coords() * r0 * ang
+        
         el_dipole = np.sum((coords) * self.rho[..., None], axis=(0, 1, 2)) * dV
         # dipole
         print("dipole electrons, D", el_dipole * e_ang2D, dV, self.V, self.nr)
