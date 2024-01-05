@@ -5,40 +5,13 @@ from scipy.special import lpmn, gamma
 from grid.angular import AngularGrid
 from grid.utils import generate_real_spherical_harmonics
 import warnings
+from tools import spherical_to_cartesian, cartesian_to_spherical
 
 
 # fmt: off
 LEBEDEV_DIRPATH = "/rds/project/rds-PDSVOqhVGhM/data/quadrature/sphere_lebedev"
 AVAILABLE_LEBEDEV = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 35, 41, 47, 53, 59, 65, 71, 77, 83, 89, 95, 101, 107, 113, 119, 125, 131]  # noqa: E501
 # fmt: on
-
-
-@nb.njit
-def symm_real_sqrtm(A):
-    """Compute the square root of a SYMMETRIC REAL matrix."""
-    # https://stackoverflow.com/questions/61262772/is-there-any-way-to-get-a-sqrt-of-a-matrix-in-numpy-not-element-wise-but-as-a
-    evalues, evectors = np.linalg.eigh(A)
-    assert (evalues >= 0).all()
-    sqrt_matrix = evectors * np.sqrt(evalues) @ evectors.T
-    return sqrt_matrix
-
-
-@nb.njit
-def spherical_to_cartesian(r, theta, phi):
-    """Convert spherical coordinates to cartesian coordinates."""
-    x = r * np.sin(phi) * np.cos(theta)
-    y = r * np.sin(phi) * np.sin(theta)
-    z = r * np.cos(phi)
-    return x, y, z
-
-
-@nb.njit
-def cartesian_to_spherical(x, y, z):
-    """Convert cartesian coordinates to spherical coordinates."""
-    r = np.sqrt(x**2 + y**2 + z**2)
-    theta = np.arctan2(y, x)
-    phi = np.arccos(z / r)
-    return r, theta, phi
 
 
 @nb.njit
@@ -94,10 +67,10 @@ def gen_sph_orders(lmax):
     """
     orders = np.zeros(((lmax + 1) ** 2, 2), dtype=np.int64)
     for l in range(lmax + 1):
-        orders[l ** 2 : (l + 1) ** 2] = l, 0
+        orders[l**2 : (l + 1) ** 2] = l, 0
         for m in range(1, l + 1):
-            orders[l ** 2 + 2 * m - 1] = l, m
-            orders[l ** 2 + 2 * m] = l, -m
+            orders[l**2 + 2 * m - 1] = l, m
+            orders[l**2 + 2 * m] = l, -m
     return orders
 
 
