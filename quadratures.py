@@ -120,12 +120,6 @@ class LebedevGrid:
         return np.sum(self.weights * x) * 4 * np.pi
 
 
-x = generate_real_spherical_harmonics(2, theta, phi)
-z = LebedevGrid(29)
-z.plot()
-z.integrate(x[0])
-
-
 def spherical_func(theta, phi):
     """Simple spherical function to test lebedev integration methods."""
     return (np.sin(theta) ** 2) * (np.cos(phi) ** 2)
@@ -162,6 +156,13 @@ def exact_sphere_polynomial_integral(monomial_exponents):
     n_vars = len(monomial_exponents)
     betas = (monomial_exponents + 1) / 2
     return 2 * np.prod(gamma(betas)) / gamma(np.sum(betas))
+
+
+"""
+x = generate_real_spherical_harmonics(2, theta, phi)
+z = LebedevGrid(29)
+z.plot()
+z.integrate(x[0])
 
 
 z = lambda x: x**2
@@ -219,3 +220,4 @@ plot_points(theta, phi, weights=weights * weights.shape[0])
 plot_points(theta, phi, weights=spherical_func(theta, phi))
 plt.scatter(theta, phi, s=spherical_func(theta, phi) * 10)
 weights.sum()
+"""
