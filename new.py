@@ -4,9 +4,6 @@ from scipy.linalg import sqrtm
 import scipy
 import numba as nb
 
-    
-
-
 
 def coefficients_polynomial(system, centers, n_max, r_cut):
     """Used to numerically calculate the inner product coeffientes of SOAP
@@ -20,9 +17,7 @@ def coefficients_polynomial(system, centers, n_max, r_cut):
     S = np.zeros((n_max, n_max))
     for i in range(1, n_max + 1):
         for j in range(1, n_max + 1):
-            S[i - 1, j - 1] = (2 * (r_cut) ** (7 + i + j)) / (
-                (5 + i + j) * (6 + i + j) * (7 + i + j)
-            )
+            S[i - 1, j - 1] = (2 * (r_cut) ** (7 + i + j)) / ((5 + i + j) * (6 + i + j) * (7 + i + j))
     betas = sqrtm(np.linalg.inv(S))
 
     def rbf_polynomial(r, n, l):
@@ -86,9 +81,7 @@ def integral(args, n, l, m, elem_pos, rbf_function):
     def soap_coeff(phi, theta, r):
         # Regular spherical harmonic, notice the abs(m)
         # needed for constructing the real form
-        ylm_comp = scipy.special.sph_harm(
-            np.abs(m), l, phi, theta
-        )  # NOTE: scipy swaps phi and theta
+        ylm_comp = scipy.special.sph_harm(np.abs(m), l, phi, theta)  # NOTE: scipy swaps phi and theta
 
         # Construct real (tesseral) spherical harmonics for
         # easier integration without having to worry about
@@ -118,11 +111,7 @@ def integral(args, n, l, m, elem_pos, rbf_function):
                 + ri_squared
                 - 2
                 * r
-                * (
-                    np.sin(theta) * np.cos(phi) * ix
-                    + np.sin(theta) * np.sin(phi) * iy
-                    + np.cos(theta) * iz
-                )
+                * (np.sin(theta) * np.cos(phi) * ix + np.sin(theta) * np.sin(phi) * iy + np.cos(theta) * iz)
             )
         )
         if weighting:
@@ -142,7 +131,7 @@ def integral(args, n, l, m, elem_pos, rbf_function):
         lambda r: t1,
         lambda r: t2,
         lambda r, theta: p1,
-        lambda r, theta: p2,    
+        lambda r, theta: p2,
         epsabs=1e-6,
         epsrel=1e-4,
     )

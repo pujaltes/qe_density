@@ -14,21 +14,19 @@ AVAILABLE_LEBEDEV = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 35,
 # fmt: on
 
 
-@nb.njit
-def legendre_polynomial(x, n):
-    """Legendre polynomial of order n."""
-    if n == 0:
-        return 1
-    elif n == 1:
-        return x
-    else:
-        return (2 * n - 1) / n * x * legendre_polynomial(x, n - 1) - (n - 1) / n * legendre_polynomial(x, n - 2)
+def gaussian_quadrature_pts(a, b, n):
+    """Get gauss legendre quadrature points for the interval [a, b] with n nodes."""
+    rx, w = np.polynomial.legendre.leggauss(n)
+    # Change of interval from [-1, 1] to [a, b] of defiiite integral
+    rx = 0.5 * ((b - a) * rx + (b + a))
+    w = 0.5 * (b - a) * w
+    return rx, w
 
 
 def gaussian_quadrature(f, a, b, n):
-    """Gaussian quadrature for a function f over the interval [a, b] with n nodes."""
-    x, w = np.polynomial.legendre.leggauss(n)
-    return 0.5 * (b - a) * np.sum(w * f(0.5 * (b - a) * x + 0.5 * (b + a)))
+    """Gaussian legendre quadrature for a function f over the interval [a, b] with n nodes."""
+    x, w = gaussian_quadrature_pts(a, b, n)
+    return np.sum(w * f(x))
 
 
 def get_lebedev(n):
@@ -42,8 +40,7 @@ def get_lebedev(n):
     return theta, phi, weights
 
 
-# plot points in 3d using spherical coordinates
-def plot_points(x, y, z, weights=None, ax=None):
+def plot_lebedev_points(x, y, z, weights=None, ax=None):
     """Plot points in 3d using spherical coordinates."""
     if ax is None:
         fig = plt.figure()
@@ -58,20 +55,6 @@ def plot_points(x, y, z, weights=None, ax=None):
     # change angle of view
     # ax.view_init(30, 90)
     return ax
-
-
-def gen_sph_orders(lmax):
-    """
-    Generate the spherical harmonic orders for a given lmax.
-    l i degree and m is order
-    """
-    orders = np.zeros(((lmax + 1) ** 2, 2), dtype=np.int64)
-    for l in range(lmax + 1):
-        orders[l**2 : (l + 1) ** 2] = l, 0
-        for m in range(1, l + 1):
-            orders[l**2 + 2 * m - 1] = l, m
-            orders[l**2 + 2 * m] = l, -m
-    return orders
 
 
 class LebedevGrid:
@@ -98,17 +81,17 @@ class LebedevGrid:
     def plot(self, ax=None, use_weights=False):
         """Plot the Lebedev grid."""
         if not use_weights:
-            return plot_points(*self.points, ax=ax)
+            return plot_lebedev_points(*self.points, ax=ax)
         else:
-            return plot_points(*self.points, self.weights, ax=ax)
+            return plot_lebedev_points(*self.points, self.weights, ax=ax)
 
-    def integrate(self, x):
+    def integrate(self, fx):
         """
         Integrate a function over the Lebedev grid.
 
         Parameters
         ----------
-        x : array-like
+        fx : array-like
             The values of the function to integrate over the Lebedev grid.
             (i.e. the function evaluated at the grid points)
 
@@ -117,7 +100,22 @@ class LebedevGrid:
         float
             The result of the integration over the grid.
         """
-        return np.sum(self.weights * x) * 4 * np.pi
+        return np.sum(self.weights * fx) * 4 * np.pi
+
+
+# ----------------- Testing ----------------- #
+def test_gaussian_quadrature():
+    """Test the gaussian quadrature method with simple $x^2$ function"""
+    tst = lambda x: x**2
+    tst_integral = lambda x: x**3 / 3
+
+    a = 0
+    b = 10
+    n = 1000
+
+    print(gaussian_quadrature(tst, a, b, n))
+    print(f"Exact: {tst_integral(b) - tst_integral(a)}")
+    print(f"Gaussian quadrature: {gaussian_quadrature(tst, a, b, n)}")
 
 
 def spherical_func(theta, phi):

@@ -25,39 +25,41 @@ def compute_distances(coords, atoms_positions):
 
     return distances
 
-@nb.njit
-def integrate_samples(x_values, y_values, z_values, f_values):
-    """
-    Numerically integrate a function represented by samples using the trapezoidal rule.
-    Assumes evenly spaced points in each dimension.
 
-    Parameters:
-    - x_values, y_values, z_values: 1D arrays of evenly spaced points in x, y, z dimensions.
-    - f_values: 3D array of function values at the corresponding (x, y, z) points.
+# This doesn't work for our purposes as we are computing integrals over a radial grid not a cartesian grid
+# @nb.njit
+# def integrate_samples(x_values, y_values, z_values, f_values):
+#     """
+#     Numerically integrate a function represented by samples using the trapezoidal rule.
+#     Assumes evenly spaced points in each dimension.
 
-    Returns:
-    - Numerical integral result.
-    """
-    dx = x_values[1] - x_values[0]
-    dy = y_values[1] - y_values[0]
-    dz = z_values[1] - z_values[0]
+#     Parameters:
+#     - x_values, y_values, z_values: 1D arrays of evenly spaced points in x, y, z dimensions.
+#     - f_values: 3D array of function values at the corresponding (x, y, z) points.
 
-    integral_result = 0.0
+#     Returns:
+#     - Numerical integral result.
+#     """
+#     dx = x_values[1] - x_values[0]
+#     dy = y_values[1] - y_values[0]
+#     dz = z_values[1] - z_values[0]
 
-    for i in range(len(x_values) - 1):
-        for j in range(len(y_values) - 1):
-            for k in range(len(z_values) - 1):
-                # Trapezoidal rule for each small cube in the grid
-                f_avg = 0.125 * (
-                    f_values[i, j, k]
-                    + f_values[i + 1, j, k]
-                    + f_values[i, j + 1, k]
-                    + f_values[i + 1, j + 1, k]
-                    + f_values[i, j, k + 1]
-                    + f_values[i + 1, j, k + 1]
-                    + f_values[i, j + 1, k + 1]
-                    + f_values[i + 1, j + 1, k + 1]
-                )
-                integral_result += f_avg * dx * dy * dz
+#     integral_result = 0.0
 
-    return integral_result
+#     for i in range(len(x_values) - 1):
+#         for j in range(len(y_values) - 1):
+#             for k in range(len(z_values) - 1):
+#                 # Trapezoidal rule for each small cube in the grid
+#                 f_avg = 0.125 * (
+#                     f_values[i, j, k]
+#                     + f_values[i + 1, j, k]
+#                     + f_values[i, j + 1, k]
+#                     + f_values[i + 1, j + 1, k]
+#                     + f_values[i, j, k + 1]
+#                     + f_values[i + 1, j, k + 1]
+#                     + f_values[i, j + 1, k + 1]
+#                     + f_values[i + 1, j + 1, k + 1]
+#                 )
+#                 integral_result += f_avg * dx * dy * dz
+
+#     return integral_result

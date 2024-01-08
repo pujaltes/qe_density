@@ -3,26 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from os.path import join as pjoin
 import os
-from scipy.interpolate import RegularGridInterpolator
-
-DIRPATH = "/home/sp2120/rds/rds-pdb_dist-PDSVOqhVGhM/data/qm9/dsgdb9nsd_atom15_out"
-dens = qer.Density(pjoin(DIRPATH, "dsgdb9nsd_130767.hdf5"))
-dens.rho
-dens.rot
-dens.trans
-dens.atoms_positions
-dens.cell
-trans_mat = dens.rot @ dens.trans
-dens.trans @ dens.rot
-np.array([1, 1, 1, 1]) @ trans_mat
-xmax = ymax = zmax = 2
-xmin = ymin = zmin = -2
-matrix = np.diagflat(np.array((xmax - xmin, ymax - ymin, zmax - zmin, 1.0), np.float32, order="C"))
-matrix[0:3, 3] = ((xmax + xmin) / 2.0, (ymax + ymin) / 2.0, (zmax + zmin) / 2.0)
-dens.cell
 
 
-def project_density(rho, proj_method="mean"):
+def project_density(rho, proj_method="max"):
     """
     Project the density on every plane of the cell.
     """
@@ -73,5 +56,30 @@ def get_coords(rho_shape, cell):
             indexing="ij",
         )
     )
-    coords = np.tensordot(grid / rho_shape[:, None, None, None], cell, axes=(0, 1))
+    coords = np.tensordot(grid / np.array(rho_shape)[:, None, None, None], cell, axes=(0, 1))
     return coords
+
+
+def get_density_feats(dens):
+    """Helper function to get the density features for easier manipulation."""
+    coords = get_coords(dens.rho.shape, dens.cell)
+    return dens.rho.T.copy(), dens.atoms_positions, coords
+
+
+# DIRPATH = "/home/sp2120/rds/rds-pdb_dist-PDSVOqhVGhM/data/qm9/dsgdb9nsd_atom15_out"
+# dens = qer.Density(pjoin(DIRPATH, "dsgdb9nsd_130767.hdf5"))
+# dens.rho
+# dens.rot
+# dens.trans
+# dens.atoms_positions
+# dens.cell
+# trans_mat = dens.rot @ dens.trans
+# dens.trans @ dens.rot
+# np.array([1, 1, 1, 1]) @ trans_mat
+# xmax = ymax = zmax = 2
+# xmin = ymin = zmin = -2
+# matrix = np.diagflat(np.array((xmax - xmin, ymax - ymin, zmax - zmin, 1.0), np.float32, order="C"))
+# matrix[0:3, 3] = ((xmax + xmin) / 2.0, (ymax + ymin) / 2.0, (zmax + zmin) / 2.0)
+# dens.cell
+
+# plot_density_projections(project_density(dens.rho), dens.atoms_positions, dens.alat)
