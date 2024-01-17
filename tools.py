@@ -4,6 +4,8 @@ from get_rx import get_rx
 import matplotlib.pyplot as plt
 from scipy.linalg import sqrtm
 from scipy.interpolate import RegularGridInterpolator
+from grid.utils import generate_real_spherical_harmonics as grsh
+from scipy.linalg import lstsq
 
 
 def interpolate_density(grid_coords, f_values, interp_coords, method="linear"):
@@ -50,6 +52,7 @@ def cartesian_to_spherical(x, y, z):
     phi = np.arccos(z / r)
     return r, theta, phi
 
+
 @nb.njit
 def cartesian_to_spherical_angles(x, y, z, r):
     """Convert cartesian coordinates to spherical coordinates."""
@@ -73,7 +76,7 @@ def radial_gto(alphas, betas, rx):
     return g
 
 
-def get_basis_poly(r_cut, n_max, rx):
+def get_basis_poly(r_cut, n_max, rx, cut_pad=0):
     """Used to calculate discrete vectors for the polynomial basis functions.
 
     Args:
@@ -85,10 +88,11 @@ def get_basis_poly(r_cut, n_max, rx):
         radial direction as the first item, and the corresponding
         orthonormalized polynomial radial basis set as the second item.
     """
+    r_cut += cut_pad
     if r_cut < 0:
         raise ValueError("Radial cutoff (r_cut) must be positive.")
-    if rx.max() > r_cut or rx.min() < 0:
-        raise ValueError("Evaluation points (rx) must be within the radial cutoff.")
+    # if rx.max() > r_cut or rx.min() < 0:
+    #     raise ValueError("Evaluation points (rx) must be within the radial cutoff.")
     # Calculate the overlap of the different polynomial functions in a
     # matrix S. These overlaps defined through the dot product over the
     # radial coordinate are analytically calculable: Integrate[(rc - r)^(a
@@ -121,6 +125,121 @@ def get_basis_poly(r_cut, n_max, rx):
     gss = np.dot(betas, fs)
 
     return gss
+
+
+def lsq_sph_coeffs(rho, atoms_positions, coords, r_cut, l_max, n_max, cut_pad=0):
+    """
+    Least squares fit of spherical harmonics to electron density.
+
+    Parameters
+    ----------
+    rho : np.array (size (n_x, n_y, n_z))
+        Electron density data.
+    atoms_positions : np.array
+        Positions of the atoms.
+    coords : np.array
+        Coordinates of the grid points corresponding to the electron density.
+    r_cut : float
+        Cutoff radius.
+    l_max : int
+        Maximum azimuthal quantum number.
+    n_max : int
+        Maximum radial quantum number.
+
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - coeffs : array
+            Coefficients obtained from the least squares fit.
+        - f : list
+            List of factors used in the fit for each atom.
+        - masks : array
+            Boolean masks indicating regions within the cutoff radius.
+
+    Notes
+    -----
+    Additional information or notes about the function.
+    """
+    centred_coords = coords - atoms_positions[:, None, None, None]
+    radii = np.linalg.norm(centred_coords, axis=-1)
+    masks = radii < r_cut
+    coeffs = np.zeros((len(atoms_positions), n_max * (l_max + 1) ** 2))
+    f = []
+    for i, ap in enumerate(atoms_positions):
+        print(i)
+        mask = masks[i]
+        r = radii[i][mask]
+        c_coords = centred_coords[i][mask]
+
+        rho_vals = rho[mask]
+        theta, phi = cartesian_to_spherical_angles(*c_coords.T, r)
+        sh_vals = grsh(l_max, theta, phi)
+        poly_basis = get_basis_poly(r_cut=r_cut, n_max=n_max, rx=r, cut_pad=cut_pad)
+        factors = np.einsum("ik,jk->ijk", poly_basis, sh_vals).reshape(n_max * (l_max + 1) ** 2, -1)
+        f.append(factors)
+        # compute coefficients using least squares
+        coeffs[i], residuals, rank, s = lstsq(factors.T, rho_vals)
+    return coeffs, f, masks
+
+
+def lsq_sph_coeffs_mod(rho, atoms_positions, coords, r_cut, l_max, n_max, cut_pad=0):
+
+    centred_coords = coords - atoms_positions[:, None, None, None]
+    radii = np.linalg.norm(centred_coords, axis=-1)
+    masks = radii < r_cut
+    coeffs = np.zeros((len(atoms_positions), n_max * (l_max + 1) ** 2))
+    f = []
+    for i, ap in enumerate(atoms_positions):
+        print(i)
+        mask = masks[i]
+        r = radii[i][mask]
+        c_coords = centred_coords[i][mask]
+
+        rho_vals = rho[mask]
+        theta, phi = cartesian_to_spherical_angles(*c_coords.T, r)
+        sh_vals = grsh(l_max, theta, phi)
+        poly_basis = get_basis_poly(r_cut=r_cut, n_max=n_max, rx=r, cut_pad=cut_pad)
+        factors = np.einsum("ik,jk->ijk", poly_basis, sh_vals).reshape(n_max * (l_max + 1) ** 2, -1)
+        f.append(factors)
+        # compute coefficients using least squares
+        coeffs[i], residuals, rank, s = lstsq(factors.T, rho_vals)
+    return coeffs, f, masks
+
+
+def reconstructor(f, mask, coeffs, compute_overlaps=True):
+    """
+    Reconstructs density from factors, masks, and coefficients.
+
+    Parameters
+    ----------
+    f : list
+        List of factors used in the fit for each atom.
+    mask : array-like
+        Boolean masks indicating regions within the cutoff radius.
+    coeffs : array-like
+        Coefficients obtained from the least squares fit.
+    compute_overlaps : bool, optional
+        Flag indicating whether to compute overlaps. Default is True.
+
+    Returns
+    -------
+    array
+        Reconstructed density.
+
+    Notes
+    -----
+    Additional information or notes about the function.
+    """
+    new_rho = np.zeros(mask.shape[1:])
+    for i, m in enumerate(mask):
+        new_rho[m] += f[i].T @ coeffs[i]
+    if not compute_overlaps:
+        return new_rho
+    overlaps = np.sum(mask, axis=0)
+    overlaps[overlaps == 0] = 1
+    return new_rho / overlaps
+
 
 # def get_basis_poly(betas, rx):
 #     """Used to calculate discrete vectors for the polynomial basis functions.

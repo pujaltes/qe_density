@@ -63,7 +63,7 @@ class LebedevGrid:
     def __init__(self, degree=29):
         """Initialize Lebedev grid with n nodes."""
         # TODO: add option to select number of points rather than degree of accuracy
-        self.degree, self.n_points = self._verify_degree(degree)
+        self.degree = self._verify_degree(degree)
         self.theta, self.phi, self.weights = get_lebedev(self.degree)
         self.n_points = self.theta.shape[0]
         self.points = np.stack(spherical_to_cartesian(1, self.theta, self.phi), axis=0)
@@ -216,6 +216,6 @@ theta, phi, weights = get_lebedev(113)
 plot_points(theta, phi, weights=weights * weights.shape[0])
 
 plot_points(theta, phi, weights=spherical_func(theta, phi))
-plt.scatter(theta, phi, s=spherical_func(theta, phi) * 10)
+plt.scatter(theta, phi, s=spherical_func(theta, phi) * 10)  
 weights.sum()
 """

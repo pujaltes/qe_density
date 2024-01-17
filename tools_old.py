@@ -30,7 +30,7 @@ def plot_density_projections(projected_density, atom_positions, alat, ax=None, *
     if ax is None:
         fig, ax = plt.subplots(1, 3, figsize=(15, 5))
     else:
-        fig = ax[0].get_figure()
+        fig = ax.flatten()[0].get_figure()
     for i in range(3):
         # Transpose to get the orientation that we want
         ax[i].imshow(projected_density[i].T, origin="lower", vmin=vmin, vmax=vmax, extent=extent)
