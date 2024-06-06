@@ -1,23 +1,28 @@
 import numpy as np
 import numba as nb
-from get_rx import get_rx
 import matplotlib.pyplot as plt
 from scipy.linalg import sqrtm
 from scipy.interpolate import RegularGridInterpolator
 from grid.utils import generate_real_spherical_harmonics as grsh
 from scipy.linalg import lstsq
+from scipy.special import gamma
 
 
-def interpolate_density(grid_coords, f_values, interp_coords, method="linear"):
+def get_dens_interpolator(grid_coords, f_values, method="linear", fill_value=None):
+    bounds_error = False
+    if fill_value is None:
+        bounds_error = True        
     # method options: nearest, linear with new spline options: slinear, cubic and quintic
     # TODO: implement better interpolation methods such as rbf
     grid_points = (grid_coords[:, 0, 0][:, 0], grid_coords[0, :, 0][:, 1], grid_coords[0, 0, :][:, 2])
     if method in ["slinear", "cubic", "quintic"]:
         # TODO chunked interpolation
         raise NotImplementedError("Only nearest and linear interpolation are currently supported.")
-    interp = RegularGridInterpolator(grid_points, f_values, method=method)
+    interp = RegularGridInterpolator(
+        grid_points, f_values, method=method, fill_value=fill_value, bounds_error=bounds_error
+    )
 
-    return interp(interp_coords)
+    return interp
 
 
 def gen_sph_orders(lmax):
@@ -74,6 +79,48 @@ def radial_gto(alphas, betas, rx):
     g = np.sum(betas[..., None] * phi[:, :, None], axis=1)
 
     return g
+
+
+def get_basis_gto(r_cut, n_max, l_max, rx):
+    """Used to calculate the alpha and beta prefactors for the gto-radial"""
+    # These are the values for where the different basis functions should decay
+    # to: evenly space between 1 angstrom and r_cut.
+    a = np.linspace(1, r_cut, n_max)
+    threshold = 1e-3  # This is the fixed gaussian decay threshold
+
+    alphas_full = np.zeros((l_max + 1, n_max))
+    betas_full = np.zeros((l_max + 1, n_max, n_max))
+
+    for l in range(0, l_max + 1):
+        # The alphas are calculated so that the GTOs will decay to the set
+        # threshold value at their respective cutoffs
+        alphas = -np.log(threshold / np.power(a, l)) / a**2
+
+        # Calculate the overlap matrix
+        m = np.zeros((alphas.shape[0], alphas.shape[0]))
+        m[:, :] = alphas
+        m = m + m.transpose()
+        S = 0.5 * gamma(l + 3.0 / 2.0) * m ** (-l - 3.0 / 2.0)
+
+        # Get the beta factors that orthonormalize the set with Löwdin
+        # orthonormalization
+        betas = sqrtm(np.linalg.inv(S))
+
+        # If the result is complex, the calculation is currently halted.
+        if betas.dtype == np.complex128:
+            raise ValueError(
+                "Could not calculate normalization factors for the radial "
+                "basis in the domain of real numbers. Lowering the number of "
+                "radial basis functions (n_max) or increasing the radial "
+                "cutoff (r_cut) is advised."
+            )
+
+        alphas_full[l, :] = alphas
+        betas_full[l, :, :] = betas
+
+    gss = radial_gto(alphas_full, betas_full, rx)
+
+    return gss
 
 
 def get_basis_poly(r_cut, n_max, rx, cut_pad=0):
@@ -167,7 +214,7 @@ def lsq_sph_coeffs(rho, atoms_positions, coords, r_cut, l_max, n_max, cut_pad=0)
     coeffs = np.zeros((len(atoms_positions), n_max * (l_max + 1) ** 2))
     f = []
     for i, ap in enumerate(atoms_positions):
-        print(i)
+        # print(i)
         mask = masks[i]
         r = radii[i][mask]
         c_coords = centred_coords[i][mask]
@@ -184,7 +231,6 @@ def lsq_sph_coeffs(rho, atoms_positions, coords, r_cut, l_max, n_max, cut_pad=0)
 
 
 def lsq_sph_coeffs_mod(rho, atoms_positions, coords, r_cut, l_max, n_max, cut_pad=0):
-
     centred_coords = coords - atoms_positions[:, None, None, None]
     radii = np.linalg.norm(centred_coords, axis=-1)
     masks = radii < r_cut
@@ -239,29 +285,6 @@ def reconstructor(f, mask, coeffs, compute_overlaps=True):
     overlaps = np.sum(mask, axis=0)
     overlaps[overlaps == 0] = 1
     return new_rho / overlaps
-
-
-# def get_basis_poly(betas, rx):
-#     """Used to calculate discrete vectors for the polynomial basis functions.
-
-#     Args:
-#         r_cut(float): Radial cutoff.
-#         n_max(int): Number of polynomial radial bases.
-
-#     Returns:
-#         (np.ndarray, np.ndarray): Tuple containing the evaluation points in
-#         radial direction as the first item, and the corresponding
-#         orthonormalized polynomial radial basis set as the second item.
-#     """
-#     # Calculate the value of the orthonormalized polynomial basis at the rx
-#     # values
-#     fs = np.zeros([betas.shape[0], len(rx)])
-#     for n in range(1, betas.shape[0] + 1):
-#         fs[n - 1, :] = (betas.shape[0] - rx) ** (n + 2)
-
-#     gss = np.dot(betas, fs)
-
-#     return gss
 
 
 def example_basis_poly(r_cut=3, n_max=4, plot=False):

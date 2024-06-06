@@ -32,7 +32,7 @@ def gaussian_quadrature(f, a, b, n):
 def get_lebedev(n):
     """Get the Lebedev grid with n nodes."""
     if n not in AVAILABLE_LEBEDEV:
-        raise ValueError(f"Lebedev grid with n={n} not available.")
+        raise ValueError(f"Lebedev grid with n={n} not available.\nAvailable degrees: {AVAILABLE_LEBEDEV}")
     filepath = f"{LEBEDEV_DIRPATH}/lebedev_{n:03d}.txt"
     theta, phi, weights = np.loadtxt(filepath, unpack=True, dtype=np.float64)
     theta = theta * np.pi / 180
